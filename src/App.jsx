@@ -1,8 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import supabase from "./services/SupabaseClient";
+import axios from "axios";
 import "./App.css";
 
 function App() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const coverInputFileRef = useRef(null);
+  const songInputFileRef = useRef(null);
   const [genres, setGenres] = useState([]);
   const [inputs, setInputs] = useState({
     title: "",
@@ -43,14 +47,114 @@ function App() {
     setGenres(newGenres);
   };
 
+  const submitHandler = async (e) => {
+    e.preventDefault();
+    const coverFile = coverInputFileRef.current.files?.[0];
+    const songFile = songInputFileRef.current.files[0];
+
+    // first uplaod the song metadata to database
+    try {
+      setIsSubmitting(true);
+      const {
+        data: [song],
+        error,
+      } = await supabase
+        .from("songs")
+        .insert({
+          title: inputs.title,
+          album: inputs.album,
+          artist: inputs.artist,
+          genres: genres.map((genre) => genre.title),
+        })
+        .select();
+      if (error) throw error;
+
+      // uplaod song cover to storage if it exists
+      if (coverFile) {
+        try {
+          const coverPath = `songs/${song.id}.${coverFile.type.split("/")[1]}`;
+          const {
+            data: { signedUrl },
+            error: signedUrlError,
+          } = await supabase.storage
+            .from("covers")
+            .createSignedUploadUrl(coverPath);
+
+          if (signedUrlError) {
+            console.log(
+              "Error while generating signed url for cover : ",
+              signedUrlError
+            );
+            return;
+          }
+
+          await axios.put(signedUrl, coverFile, {
+            headers: {
+              "Content-Type": coverFile.type,
+            },
+            onUploadProgress: (progressEvent) => {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              console.log(`Cover upload Progress: ${percentCompleted}%`);
+            },
+          });
+        } catch (err) {
+          console.log("Error uploading song cover : ", err);
+        }
+      }
+
+      // uplaod song it self to storage
+      try {
+        const songPath = `${song.id}.${songFile.type.split("/")[1]}`;
+        const {
+          data: { signedUrl },
+          error: signedUrlError,
+        } = await supabase.storage
+          .from("songs")
+          .createSignedUploadUrl(songPath);
+
+        if (signedUrlError) {
+          console.log(
+            "Error while generating signed url for Song : ",
+            signedUrlError
+          );
+          return;
+        }
+
+        await axios.put(signedUrl, songFile, {
+          headers: {
+            "Content-Type": songFile.type,
+          },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            console.log(`Song upload Progress: ${percentCompleted}%`);
+          },
+        });
+      } catch (err) {
+        console.log("Error uploading song file : ", err);
+      }
+    } catch (err) {
+      console.log("Error while adding new song to database : ", err);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <>
-      <div className="h-screen bg-neutral-700 flex flex-col gap-6 justify-center items-center">
+      <div className="min-h-screen py-8 bg-neutral-700 flex flex-col gap-6 justify-center items-center">
         <button className="bg-white p-4 text-lg" onClick={signInHandler}>
           sign in
         </button>
 
-        <form action="#" className="flex flex-col gap-6">
+        <form
+          action="#"
+          className="flex flex-col gap-6"
+          onSubmit={submitHandler}
+        >
           <input
             type="text"
             value={inputs.title}
@@ -101,6 +205,34 @@ function App() {
               <Genre key={genre.id} onRemove={removeGenreHandler} {...genre} />
             ))}
           </div>
+          <div className="flex gap-4 items-center">
+            <label htmlFor="music" className="text-xl">
+              Music file
+            </label>
+            <input
+              ref={songInputFileRef}
+              type="file"
+              id="music"
+              accept="audio/mp3"
+            />
+          </div>
+          <div className="flex gap-4 items-center">
+            <label htmlFor="cover" className="text-xl">
+              Music cover
+            </label>
+            <input
+              ref={coverInputFileRef}
+              type="file"
+              id="cover"
+              accept="image/*"
+            />
+          </div>
+          <button
+            disabled={isSubmitting}
+            className="text-xl bg-white p-2 disabled:bg-neutral-500"
+          >
+            {isSubmitting ? "Please wait..." : "Submit"}
+          </button>
         </form>
       </div>
     </>
