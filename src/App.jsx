@@ -69,10 +69,16 @@ function App() {
         .select();
       if (error) throw error;
 
+      const coverPath = `songs/${song.title}-${song.artist}-${song.id}.${
+        coverFile.type.split("/")[1]
+      }`;
+      const songPath = `${song.title}-${song.artist}-${song.id}.${
+        songFile.type.split("/")[1]
+      }`;
+
       // uplaod song cover to storage if it exists
       if (coverFile) {
         try {
-          const coverPath = `songs/${song.id}.${coverFile.type.split("/")[1]}`;
           const {
             data: { signedUrl },
             error: signedUrlError,
@@ -106,7 +112,6 @@ function App() {
 
       // uplaod song it self to storage
       try {
-        const songPath = `${song.id}.${songFile.type.split("/")[1]}`;
         const {
           data: { signedUrl },
           error: signedUrlError,
@@ -136,6 +141,24 @@ function App() {
       } catch (err) {
         console.log("Error uploading song file : ", err);
       }
+
+      const {
+        data: { publicUrl: coverUrl },
+      } = supabase.storage.from("covers").getPublicUrl(coverPath);
+      const {
+        data: { publicUrl: songUrl },
+      } = supabase.storage.from("songs").getPublicUrl(songPath);
+
+      const updateSongUrlsResult = await supabase
+        .from("songs")
+        .update({ cover: coverUrl, song_url: songUrl })
+        .eq("id", song.id);
+
+      if (updateSongUrlsResult.error) throw updateSongUrlsResult.error;
+
+      console.log("Song added successfully!!!");
+
+      console.log(coverUrl, songUrl);
     } catch (err) {
       console.log("Error while adding new song to database : ", err);
     } finally {
