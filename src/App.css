@@ -1,8 +1,5 @@
 @import "tailwindcss";
 
-input {
-  padding: .5rem;
-  border: 1px solid white;
-  color: white;
-  width: 500px;
+input:not([type='file']){
+  @apply w-full border p-2 border-white text-white
 }

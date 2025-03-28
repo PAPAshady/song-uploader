@@ -1,13 +1,15 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import supabase from "./services/SupabaseClient";
 import axios from "axios";
 import "./App.css";
 
 function App() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const coverInputFileRef = useRef(null);
-  const songInputFileRef = useRef(null);
   const [genres, setGenres] = useState([]);
+  const [selectedCover, setSelectedCover] = useState(null);
+  const [selectedSong, setSelectedSong] = useState(null);
+  const [songUploadProgress, setSongUploadProgress] = useState("0%");
+  const [coverUploadProgress, setCoverUploadProgress] = useState("0%");
   const [inputs, setInputs] = useState({
     title: "",
     album: "Single",
@@ -25,11 +27,11 @@ function App() {
 
     const alreadyExists = genres.some((genre) => genre.title === inputs.genre);
 
-    if (alreadyExists) return;
+    if (alreadyExists || !inputs.genre.trim()) return;
 
     const newGenre = {
       id: genres.length + 1,
-      title: inputs.genre,
+      title: inputs.genre.trim(),
     };
 
     setGenres((prevGenres) => [...prevGenres, newGenre]);
@@ -49,8 +51,16 @@ function App() {
 
   const submitHandler = async (e) => {
     e.preventDefault();
-    const coverFile = coverInputFileRef.current.files?.[0];
-    const songFile = songInputFileRef.current.files[0];
+
+    if (!selectedCover) {
+      alert("Please select a valid song cover");
+      return;
+    }
+
+    if (!selectedSong) {
+      alert("Please select a valid song file");
+      return;
+    }
 
     // first uplaod the song metadata to database
     try {
@@ -69,45 +79,44 @@ function App() {
         .select();
       if (error) throw error;
 
-      const coverPath = `songs/${song.title}-${song.artist}-${song.id}.${
-        coverFile.type.split("/")[1]
+      const coverPath = `${song.title}-${song.artist}-${song.id}.${
+        selectedCover.type.split("/")[1]
       }`;
+
       const songPath = `${song.title}-${song.artist}-${song.id}.${
-        songFile.type.split("/")[1]
+        selectedSong.type.split("/")[1]
       }`;
 
       // uplaod song cover to storage if it exists
-      if (coverFile) {
-        try {
-          const {
-            data: { signedUrl },
-            error: signedUrlError,
-          } = await supabase.storage
-            .from("covers")
-            .createSignedUploadUrl(coverPath);
+      try {
+        const {
+          data: { signedUrl },
+          error: signedUrlError,
+        } = await supabase.storage
+          .from("song-covers")
+          .createSignedUploadUrl(coverPath);
 
-          if (signedUrlError) {
-            console.log(
-              "Error while generating signed url for cover : ",
-              signedUrlError
-            );
-            return;
-          }
-
-          await axios.put(signedUrl, coverFile, {
-            headers: {
-              "Content-Type": coverFile.type,
-            },
-            onUploadProgress: (progressEvent) => {
-              const percentCompleted = Math.round(
-                (progressEvent.loaded * 100) / progressEvent.total
-              );
-              console.log(`Cover upload Progress: ${percentCompleted}%`);
-            },
-          });
-        } catch (err) {
-          console.log("Error uploading song cover : ", err);
+        if (signedUrlError) {
+          console.log(
+            "Error while generating signed url for cover : ",
+            signedUrlError
+          );
+          return;
         }
+
+        await axios.put(signedUrl, selectedCover, {
+          headers: {
+            "Content-Type": selectedCover.type,
+          },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            setCoverUploadProgress(`${percentCompleted}%`);
+          },
+        });
+      } catch (err) {
+        console.log("Error uploading song cover : ", err);
       }
 
       // uplaod song it self to storage
@@ -127,15 +136,15 @@ function App() {
           return;
         }
 
-        await axios.put(signedUrl, songFile, {
+        await axios.put(signedUrl, selectedSong, {
           headers: {
-            "Content-Type": songFile.type,
+            "Content-Type": selectedSong.type,
           },
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
             );
-            console.log(`Song upload Progress: ${percentCompleted}%`);
+            setSongUploadProgress(`${percentCompleted}%`);
           },
         });
       } catch (err) {
@@ -156,9 +165,8 @@ function App() {
 
       if (updateSongUrlsResult.error) throw updateSongUrlsResult.error;
 
-      console.log("Song added successfully!!!");
-
-      console.log(coverUrl, songUrl);
+      alert("Song added successfully!!!");
+      clearInputs();
     } catch (err) {
       console.log("Error while adding new song to database : ", err);
     } finally {
@@ -166,97 +174,150 @@ function App() {
     }
   };
 
+  function clearInputs() {
+    setInputs({ title: "", artist: "", album: "", genre: "" });
+    setGenres([]);
+    setSelectedCover(null);
+    setSelectedSong(null);
+    setCoverUploadProgress("0%");
+    setSongUploadProgress("0%");
+  }
+
   return (
     <>
-      <div className="min-h-screen py-8 bg-neutral-700 flex flex-col gap-6 justify-center items-center">
-        <button className="bg-white p-4 text-lg" onClick={signInHandler}>
-          sign in
-        </button>
+      <div className="min-h-screen p-8 bg-neutral-700">
+        <div className="flex flex-col gap-6 justify-center items-center container mx-auto max-w-[700px] pt-12">
+          <button className="bg-white p-4 text-lg" onClick={signInHandler}>
+            sign in
+          </button>
 
-        <form
-          action="#"
-          className="flex flex-col gap-6"
-          onSubmit={submitHandler}
-        >
-          <input
-            type="text"
-            value={inputs.title}
-            onChange={(e) =>
-              setInputs((prevInputs) => {
-                return { ...prevInputs, title: e.target.value };
-              })
-            }
-            placeholder="title"
-          />
-          <input
-            type="text"
-            value={inputs.album}
-            onChange={(e) =>
-              setInputs((prevInputs) => {
-                return { ...prevInputs, album: e.target.value };
-              })
-            }
-            placeholder="album"
-          />
-          <input
-            type="text"
-            value={inputs.artist}
-            onChange={(e) =>
-              setInputs((prevInputs) => {
-                return { ...prevInputs, artist: e.target.value };
-              })
-            }
-            placeholder="artist"
-          />
-          <div className="flex items-center gap-2">
+          <form
+            action="#"
+            className="flex flex-col gap-6 w-full"
+            onSubmit={submitHandler}
+          >
             <input
               type="text"
-              value={inputs.genre}
+              value={inputs.title}
               onChange={(e) =>
                 setInputs((prevInputs) => {
-                  return { ...prevInputs, genre: e.target.value };
+                  return { ...prevInputs, title: e.target.value };
                 })
               }
-              placeholder="genre"
+              placeholder="title"
             />
-            <button className="bg-white p-2 text-lg" onClick={addGenreHandler}>
-              Add
+            <input
+              type="text"
+              value={inputs.album}
+              onChange={(e) =>
+                setInputs((prevInputs) => {
+                  return { ...prevInputs, album: e.target.value };
+                })
+              }
+              placeholder="album"
+            />
+            <input
+              type="text"
+              value={inputs.artist}
+              onChange={(e) =>
+                setInputs((prevInputs) => {
+                  return { ...prevInputs, artist: e.target.value };
+                })
+              }
+              placeholder="artist"
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={inputs.genre}
+                onChange={(e) =>
+                  setInputs((prevInputs) => {
+                    return { ...prevInputs, genre: e.target.value };
+                  })
+                }
+                placeholder="genre"
+              />
+              <button
+                className="bg-white p-2 text-lg"
+                onClick={addGenreHandler}
+              >
+                Add
+              </button>
+            </div>
+            <div className="flex items-center flex-wrap max-w-[600px] gap-4">
+              {genres.map((genre) => (
+                <Genre
+                  key={genre.id}
+                  onRemove={removeGenreHandler}
+                  {...genre}
+                />
+              ))}
+            </div>
+            <div className="flex items-center flex-col sm:flex-row gap-6">
+              <div className="flex gap-4 items-cente grow w-full text-center">
+                <label
+                  htmlFor="music"
+                  className="relative cursor-pointer border-dashed border text-white border-white w-full p-8"
+                >
+                  <span className="text-xl">Music file</span>
+                  <p className="mt-2 text-neutral-300">
+                    {selectedSong?.name || "No files selected"}
+                  </p>
+                  <div className="h-4 w-full bg-neutral-500 mt-3 relative">
+                    <span className="absolute text-white -translate-1/2 left-1/2 top-1/2 text-sm">
+                      {coverUploadProgress}
+                    </span>
+                    <div
+                      className="h-full bg-blue-400"
+                      style={{ width: coverUploadProgress }}
+                    ></div>
+                  </div>
+                  <input
+                    type="file"
+                    id="music"
+                    accept="audio/*"
+                    className="absolute opacity-0"
+                    onChange={(e) => setSelectedSong(e.target.files?.[0])}
+                  />
+                </label>
+              </div>
+              <div className="flex gap-4 items-center grow w-full text-center">
+                <label
+                  htmlFor="cover"
+                  className="relative cursor-pointer border-dashed border text-white border-white w-full p-8"
+                >
+                  <span className="text-xl">Music cover</span>
+                  <p className="mt-2 text-neutral-300">
+                    {selectedCover?.name || "No files selected"}
+                  </p>
+                  <div className="h-4 w-full bg-neutral-500 mt-3 relative">
+                    <span className="absolute text-white -translate-1/2 left-1/2 top-1/2 text-sm">
+                      {songUploadProgress}
+                    </span>
+                    <div
+                      className="h-full bg-blue-400"
+                      style={{ width: songUploadProgress }}
+                    ></div>
+                  </div>
+                  <input
+                    type="file"
+                    id="cover"
+                    accept="image/*"
+                    className="absolute opacity-0"
+                    onChange={(e) => setSelectedCover(e.target.files?.[0])}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <button
+              disabled={isSubmitting}
+              className="text-xl bg-white p-2 disabled:bg-neutral-500 grow"
+            >
+              {isSubmitting ? "Please wait..." : "Submit"}
             </button>
-          </div>
-          <div className="flex items-center flex-wrap max-w-[600px] gap-4">
-            {genres.map((genre) => (
-              <Genre key={genre.id} onRemove={removeGenreHandler} {...genre} />
-            ))}
-          </div>
-          <div className="flex gap-4 items-center">
-            <label htmlFor="music" className="text-xl">
-              Music file
-            </label>
-            <input
-              ref={songInputFileRef}
-              type="file"
-              id="music"
-              accept="audio/mp3"
-            />
-          </div>
-          <div className="flex gap-4 items-center">
-            <label htmlFor="cover" className="text-xl">
-              Music cover
-            </label>
-            <input
-              ref={coverInputFileRef}
-              type="file"
-              id="cover"
-              accept="image/*"
-            />
-          </div>
-          <button
-            disabled={isSubmitting}
-            className="text-xl bg-white p-2 disabled:bg-neutral-500"
-          >
-            {isSubmitting ? "Please wait..." : "Submit"}
-          </button>
-        </form>
+          </form>
+        </div>
       </div>
     </>
   );
@@ -266,10 +327,7 @@ function Genre({ title, onRemove, id }) {
   return (
     <div className="flex p-3 border border-white items-center gap-2">
       <span className="text-lg text-white">{title}</span>
-      <button
-        onClick={(e) => onRemove(e, id)}
-        className="bg-white text-sm p-2 text-lg"
-      >
+      <button onClick={(e) => onRemove(e, id)} className="bg-white text-sm p-2">
         X
       </button>
     </div>
