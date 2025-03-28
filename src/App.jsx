@@ -18,8 +18,17 @@ function App() {
   });
 
   async function signInHandler() {
-    const result = await supabase.auth.signInWithOAuth({ provider: "github" });
-    console.log(result);
+    const { error } = await supabase.auth.signInWithPassword({
+      email: "zamani.nima18@gmail.com",
+      password: "123456789",
+    });
+    if (error) {
+      alert("Error while signing in");
+      console.log("Sign in error : ", error);
+      return;
+    }
+
+    alert("Signed in successfully!!!!");
   }
 
   const addGenreHandler = (e) => {
@@ -103,6 +112,7 @@ function App() {
             "Error while generating signed url for cover : ",
             signedUrlError
           );
+          alert("Error while generating signed url for cover");
           return;
         }
 
@@ -119,6 +129,8 @@ function App() {
         });
       } catch (err) {
         console.log("Error uploading song cover : ", err);
+        alert("Error uploading song cover");
+        return;
       }
 
       // uplaod song it self to storage
@@ -135,6 +147,7 @@ function App() {
             "Error while generating signed url for Song : ",
             signedUrlError
           );
+          alert("Error while generating signed url for Song");
           return;
         }
 
@@ -151,6 +164,8 @@ function App() {
         });
       } catch (err) {
         console.log("Error uploading song file : ", err);
+        alert("Error uploading song file");
+        return;
       }
 
       const {
@@ -171,6 +186,7 @@ function App() {
       clearInputs();
     } catch (err) {
       console.log("Error while adding new song to database : ", err);
+      alert("Error while adding new song to database");
     } finally {
       setIsSubmitting(false);
     }
