@@ -87,6 +87,8 @@ function App() {
         selectedSong.type.split("/")[1]
       }`;
 
+      console.log(songPath);
+
       // uplaod song cover to storage if it exists
       try {
         const {
@@ -260,7 +262,7 @@ function App() {
                   className="relative cursor-pointer border-dashed border text-white border-white w-full p-8"
                 >
                   <span className="text-xl">Music file</span>
-                  <p className="mt-2 text-neutral-300">
+                  <p className="mt-2 text-neutral-300 line-clamp-1">
                     {selectedSong?.name || "No files selected"}
                   </p>
                   <div className="h-4 w-full bg-neutral-500 mt-3 relative">
@@ -287,7 +289,7 @@ function App() {
                   className="relative cursor-pointer border-dashed border text-white border-white w-full p-8"
                 >
                   <span className="text-xl">Music cover</span>
-                  <p className="mt-2 text-neutral-300">
+                  <p className="mt-2 text-neutral-300 line-clamp-1">
                     {selectedCover?.name || "No files selected"}
                   </p>
                   <div className="h-4 w-full bg-neutral-500 mt-3 relative">
