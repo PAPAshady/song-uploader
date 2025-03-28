@@ -153,7 +153,7 @@ function App() {
 
       const {
         data: { publicUrl: coverUrl },
-      } = supabase.storage.from("covers").getPublicUrl(coverPath);
+      } = supabase.storage.from("song-covers").getPublicUrl(coverPath);
       const {
         data: { publicUrl: songUrl },
       } = supabase.storage.from("songs").getPublicUrl(songPath);
