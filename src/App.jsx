@@ -283,11 +283,11 @@ function App() {
                   </p>
                   <div className="h-4 w-full bg-neutral-500 mt-3 relative">
                     <span className="absolute text-white -translate-1/2 left-1/2 top-1/2 text-sm">
-                      {coverUploadProgress}
+                      {songUploadProgress}
                     </span>
                     <div
                       className="h-full bg-blue-400"
-                      style={{ width: coverUploadProgress }}
+                      style={{ width: songUploadProgress }}
                     ></div>
                   </div>
                   <input
@@ -310,11 +310,11 @@ function App() {
                   </p>
                   <div className="h-4 w-full bg-neutral-500 mt-3 relative">
                     <span className="absolute text-white -translate-1/2 left-1/2 top-1/2 text-sm">
-                      {songUploadProgress}
+                      {coverUploadProgress}
                     </span>
                     <div
                       className="h-full bg-blue-400"
-                      style={{ width: songUploadProgress }}
+                      style={{ width: coverUploadProgress }}
                     ></div>
                   </div>
                   <input
